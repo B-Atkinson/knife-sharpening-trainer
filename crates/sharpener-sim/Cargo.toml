@@ -1,0 +1,8 @@
+[package]
+name = "sharpener-sim"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sharpener-core = { path = "../sharpener-core" }
+sharpener-math = { path = "../sharpener-math" }

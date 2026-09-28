@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "crates/sharpener-math",
+    "crates/sharpener-core",
+    "crates/sharpener-protocol",
+    "crates/sharpener-sim",
+    "crates/sharpener-firmware",
+    "crates/sharpener-desktop",
+]
+resolver = "2"
