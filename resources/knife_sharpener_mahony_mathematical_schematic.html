@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Knife Sharpener IMU — Mathematical Schematic</title>
+<meta name="description" content="Implementation-grade mathematical specification for bench calibration, 6-DOF Mahony attitude estimation, adaptive accelerometer weighting, and geometric sharpening-angle measurement." />
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['\\(','\\)']],
+    displayMath: [['\\[','\\]']],
+    processEscapes: true,
+    tags: 'none'
+  },
+  chtml: { scale: 1.0 }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  :root {
+    --ink:#17212b; --muted:#52606d; --line:#d7dee5; --panel:#f6f8fa;
+    --accent:#1d5f8a; --accent2:#194f72; --warn:#8a4b13; --good:#276749;
+    --code:#f1f4f7; --paper:#fff; --shadow:0 6px 20px rgba(25,48,68,.08);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:#eef2f5;color:var(--ink);font:16px/1.58 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  .page{max-width:1120px;margin:28px auto;background:var(--paper);box-shadow:var(--shadow);border-radius:12px;overflow:hidden}
+  header{padding:48px 56px 34px;background:linear-gradient(145deg,#f8fbfd,#edf5fa);border-bottom:1px solid var(--line)}
+  header h1{margin:0 0 8px;font-size:2.35rem;line-height:1.1;letter-spacing:-.03em}
+  header .subtitle{font-size:1.08rem;color:var(--accent2);font-weight:650;margin-bottom:16px}
+  header .meta{color:var(--muted);font-size:.94rem}
+  main{padding:34px 56px 60px}
+  nav.toc{border:1px solid var(--line);background:var(--panel);padding:22px 26px;border-radius:10px;margin:0 0 36px}
+  nav.toc h2{margin-top:0;font-size:1.12rem;border:0;padding:0}
+  nav.toc ol{columns:2;column-gap:40px;margin-bottom:0;padding-left:22px}
+  nav.toc li{break-inside:avoid;margin:5px 0}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  h2{margin:48px 0 16px;padding-top:6px;font-size:1.68rem;letter-spacing:-.02em;border-bottom:2px solid #e9eef2;padding-bottom:8px}
+  h3{margin:30px 0 10px;font-size:1.22rem;color:#23384a}
+  h4{margin:22px 0 8px;font-size:1.02rem}
+  p{margin:10px 0 14px}
+  .lead{font-size:1.05rem}
+  .callout{border-left:4px solid var(--accent);background:#f4f9fc;padding:14px 18px;margin:18px 0;border-radius:0 8px 8px 0}
+  .callout.warn{border-color:#d17b2c;background:#fff8ef}
+  .callout.good{border-color:#42966b;background:#f2fbf5}
+  .callout strong:first-child{color:#173f59}
+  .equation-note{color:var(--muted);font-size:.94rem;margin-top:-4px}
+  table{width:100%;border-collapse:collapse;margin:18px 0 28px;font-size:.94rem}
+  th,td{border:1px solid var(--line);padding:10px 12px;vertical-align:top;text-align:left}
+  th{background:#eef4f7;font-weight:700}
+  tr:nth-child(even) td{background:#fbfcfd}
+  code,pre{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace}
+  code{background:var(--code);padding:.1em .3em;border-radius:4px;font-size:.92em}
+  pre{background:#17212b;color:#eef5f8;padding:18px 20px;border-radius:9px;overflow:auto;font-size:.88rem;line-height:1.5}
+  .small{font-size:.9rem;color:var(--muted)}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .card{border:1px solid var(--line);border-radius:9px;padding:16px 18px;background:#fff}
+  .card h4{margin-top:0}
+  .good-result{color:var(--good);font-weight:650}
+  .direction-up{font-weight:750;color:#7a3d00}.direction-down{font-weight:750;color:#7b2635}
+  footer{border-top:1px solid var(--line);padding:22px 56px 34px;color:var(--muted);font-size:.9rem;background:#fafbfc}
+  .axis-diagram{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;border:1px solid var(--line);background:#fbfdfe;padding:16px 18px;border-radius:9px;margin:18px 0}
+  .axis-symbol{font-size:1.8rem;color:var(--accent2);font-weight:700}
+  .formula-list li{margin:8px 0}
+  .tune-table td:nth-child(1){font-weight:700;white-space:nowrap}
+  .tune-table td:nth-child(2){white-space:nowrap}
+  .diag{margin:16px 0 22px;border:1px solid var(--line);border-radius:9px;padding:14px 16px;background:#fcfdfe}
+  .diag p{margin:5px 0}
+  @media(max-width:760px){.page{margin:0;border-radius:0}.page header,main,footer{padding-left:22px;padding-right:22px}nav.toc ol{columns:1}.two-col{grid-template-columns:1fr}table{font-size:.88rem}header h1{font-size:1.85rem}}
+  @media print{body{background:white}.page{max-width:none;margin:0;box-shadow:none;border-radius:0}a{color:inherit;text-decoration:none}nav.toc{break-after:page}h2{break-before:page}h2:first-of-type{break-before:auto}table,pre,.callout,.diag{break-inside:avoid}.page{overflow:visible}}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  <h1>Knife Sharpener IMU<br/>Mathematical Schematic</h1>
+  <div class="subtitle">Bench calibration + 6-DOF Mahony attitude estimation + geometric sharpening-angle measurement</div>
+  <div class="meta">Implementation draft v0.3 &nbsp;•&nbsp; Quaternion convention <strong>[w, x, y, z]</strong> &nbsp;•&nbsp; Filter angular rates in <strong>rad/s</strong> &nbsp;•&nbsp; No Euler-angle extraction</div>
+</header>
+<main>
+<p class="lead"><strong>Purpose.</strong> This document is intended to be precise enough to translate directly into Rust. The Mahony filter estimates a full 3D unit quaternion. The user-facing sharpening angle is then computed geometrically from plane normals rather than from Euler pitch/roll/yaw.</p>
+<div class="callout good"><strong>Core design decision.</strong> The attitude estimator and the sharpening-angle measurement are separate concerns. Mahony maintains the best estimate of orientation; the application computes one scalar angle from that orientation using vector geometry.</div>
+
+<nav class="toc">
+<h2>Contents</h2>
+<ol>
+  <li><a href="#conventions">Assumptions and coordinate conventions</a></li>
+  <li><a href="#primitives">Mathematical primitives</a></li>
+  <li><a href="#symbols">Symbol and state reference</a></li>
+  <li><a href="#calibration">Phase 1 — Bench-rest calibration</a></li>
+  <li><a href="#target">Phase 2 — Raise blade and acquire target</a></li>
+  <li><a href="#maintenance">Phase 3 — Mahony maintenance loop</a></li>
+  <li><a href="#tone">Application error and tone logic</a></li>
+  <li><a href="#pseudocode">Complete execution-order pseudocode</a></li>
+  <li><a href="#rust">Rust-oriented data model</a></li>
+  <li><a href="#safeguards">Numerical safeguards</a></li>
+  <li><a href="#tuning">Gain and weighting tuning plan</a></li>
+  <li><a href="#tests">Sanity tests</a></li>
+  <li><a href="#limitations">6-DOF limitation</a></li>
+  <li><a href="#caveat">Calibration-surface caveat</a></li>
+  <li><a href="#source-v-project">Canonical vs project-specific math</a></li>
+  <li><a href="#references">References</a></li>
+</ol>
+</nav>
+
+<section id="conventions">
+<h2>1. Non-negotiable assumptions and coordinate conventions</h2>
+<div class="axis-diagram">
+  <div class="axis-symbol">X/Y/Z</div>
+  <div><strong>Ideal physical mounting:</strong> \(+X_I\) runs along the blade toward the handle; \(+Y_I\) runs across the blade from cutting edge toward spine; \(+Z_I = +X_I \times +Y_I\) is normal to the IMU board / blade face. The geometric output calculation does not require perfect X/Y alignment.</div>
+</div>
+<p>Define two frames:</p>
+<ul>
+  <li><strong>\(I\): current IMU/body frame.</strong> This frame moves with the sensor.</li>
+  <li><strong>\(C\): calibration/reference frame.</strong> This frame is frozen when bench calibration completes.</li>
+</ul>
+<p>The primary attitude state is the unit quaternion</p>
+\[
+{}^{C}_{I}\hat q =
+\begin{bmatrix}q_w & q_x & q_y & q_z\end{bmatrix}^{T},
+\qquad
+\left\|{}^{C}_{I}\hat q\right\|=1.
+\]
+<p>Its meaning is:</p>
+<div class="callout"><strong>Frame meaning.</strong> \({}^{C}_{I}\hat q\) rotates a vector expressed in the current body frame \(I\) into the fixed calibration frame \(C\).</div>
+<p>Quaternion component order is always</p>
+\[
+\boxed{[w,x,y,z]}
+\]
+<p>and never \([x,y,z,w]\). Gyroscope values are converted to radians/second before they enter filter math. Internal angles are radians; degrees are only a UI/logging representation.</p>
+<div class="callout warn"><strong>Calibration assumption.</strong> During bench-rest calibration, the blade face must be flat on a <em>level</em> reference surface whose plane is the desired \(0^\circ\) sharpening plane. This is what lets the accelerometer measurement identify the blade-plane normal without requiring exact knowledge of IMU-to-blade mounting alignment.</div>
+</section>
+
+<section id="primitives">
+<h2>2. Mathematical primitives used everywhere</h2>
+<p>Implement these as small, separately tested functions before implementing the filter.</p>
+
+<h3>2.1 Vector norm and normalization</h3>
+For a 3-vector \(\mathbf u=[u_x,u_y,u_z]^T\):
+\[
+\|\mathbf u\|=\sqrt{u_x^2+u_y^2+u_z^2}
+\]
+\[
+\operatorname{normalize}(\mathbf u)=\frac{\mathbf u}{\|\mathbf u\|}.
+\]
+<p>Never normalize a vector whose norm is near zero. Treat that sample as invalid instead.</p>
+
+<h3>2.2 Dot product</h3>
+\[
+\mathbf u\cdot\mathbf v=u_xv_x+u_yv_y+u_zv_z.
+\]
+<p>The result is a scalar. For unit vectors, it is the cosine of their separation angle.</p>
+
+<h3>2.3 3D cross product</h3>
+\[
+\mathbf u\times\mathbf v=
+\begin{bmatrix}
+ u_yv_z-u_zv_y\\
+ u_zv_x-u_xv_z\\
+ u_xv_y-u_yv_x
+\end{bmatrix}.
+\]
+<p>The result is a 3D vector perpendicular to both inputs. This is the operation used to form the Mahony accelerometer innovation.</p>
+
+<h3>2.4 Quaternion conjugate and inverse</h3>
+For
+\[
+q=\begin{bmatrix}q_w&q_x&q_y&q_z\end{bmatrix}^T,
+\]
+its conjugate is
+\[
+q^*=\operatorname{conj}(q)=
+\begin{bmatrix}q_w&-q_x&-q_y&-q_z\end{bmatrix}^T.
+\]
+For a unit quaternion,
+\[
+q^{-1}=q^*.
+\]
+<p>We normalize the attitude quaternion after every numerical integration step so this remains true.</p>
+
+<h3>2.5 Hamilton quaternion multiplication — not a cross product</h3>
+<p>For \(p=[p_w,p_x,p_y,p_z]^T\) and \(q=[q_w,q_x,q_y,q_z]^T\):</p>
+\[
+ p\otimes q=
+ \begin{bmatrix}
+ p_wq_w-p_xq_x-p_yq_y-p_zq_z\\
+ p_wq_x+p_xq_w+p_yq_z-p_zq_y\\
+ p_wq_y-p_xq_z+p_yq_w+p_zq_x\\
+ p_wq_z+p_xq_y-p_yq_x+p_zq_w
+ \end{bmatrix}.
+\]
+<div class="callout"><strong>Operator rule.</strong> \(\otimes\) always means Hamilton quaternion multiplication in this document. \(\times\) always means a 3D vector cross product.</div>
+
+<h3>2.6 Pure quaternions and <code>vector_part()</code></h3>
+<p>A 3D vector \(\mathbf u=[u_x,u_y,u_z]^T\) can be embedded in quaternion algebra as the <em>pure quaternion</em></p>
+\[
+U=\begin{bmatrix}0&u_x&u_y&u_z\end{bmatrix}^T.
+\]
+<p>Define</p>
+\[
+\operatorname{vector\_part}
+\left(
+\begin{bmatrix}w&x&y&z\end{bmatrix}^T
+\right)
+=
+\begin{bmatrix}x&y&z\end{bmatrix}^T.
+\]
+<p>So yes: <code>vector_part()</code> simply discards the quaternion's scalar component \(w\) and returns the remaining three components. When the quaternion represents a rotated pure vector, the scalar component should be zero mathematically and may only contain tiny floating-point residue numerically.</p>
+
+<h3>2.7 Rotate a 3D vector with \({}^{C}_{I}\hat q\)</h3>
+<p>To rotate \({}^{I}\mathbf u\) from the current IMU frame into the calibration frame, first form the pure quaternion \(U_I=[0,{}^{I}\mathbf u]^T\), then:</p>
+\[
+U_C={}^{C}_{I}\hat q\otimes U_I\otimes\left({}^{C}_{I}\hat q\right)^*.
+\]
+Therefore
+\[
+\boxed{
+\operatorname{rotate}_{I\rightarrow C}(q,\mathbf u)
+=
+\operatorname{vector\_part}
+\left(q\otimes[0,\mathbf u]\otimes q^*\right)
+}
+\]
+The opposite transformation is
+\[
+\boxed{
+\operatorname{rotate}_{C\rightarrow I}(q,\mathbf u)
+=
+\operatorname{vector\_part}
+\left(q^*\otimes[0,\mathbf u]\otimes q\right).
+}
+\]
+</section>
+
+<section id="symbols">
+<h2>3. Symbol and state reference</h2>
+<table>
+<thead><tr><th>Symbol / code name</th><th>Size</th><th>Frame</th><th>Units</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>\({}^{I}\mathbf a_m\) / <code>accel_raw</code></td><td>3</td><td>\(I\)</td><td>m/s²</td><td>Current measured accelerometer vector.</td></tr>
+<tr><td>\({}^{I}\boldsymbol\omega_m\) / <code>gyro_raw</code></td><td>3</td><td>\(I\)</td><td>rad/s</td><td>Current measured gyroscope angular-rate vector.</td></tr>
+<tr><td>\({}^{I}\mathbf b_0\) / <code>gyro_bias_start</code></td><td>3</td><td>sensor axes</td><td>rad/s</td><td>Startup gyro bias averaged during calibration.</td></tr>
+<tr><td>\({}^{I}\mathbf b_r\) / <code>gyro_bias_residual</code></td><td>3</td><td>sensor axes</td><td>rad/s</td><td>Slow residual bias estimated by Mahony integral action.</td></tr>
+<tr><td>\({}^{C}\hat{\mathbf g}\) / <code>accel_ref_c</code></td><td>3</td><td>\(C\)</td><td>unitless</td><td>Normalized calibration acceleration direction, fixed in \(C\).</td></tr>
+<tr><td>\({}^{I}\hat{\mathbf n}_{blade}\) / <code>blade_normal_body</code></td><td>3</td><td>body-fixed</td><td>unitless</td><td>Blade-plane normal stored in body coordinates.</td></tr>
+<tr><td>\({}^{C}\hat{\mathbf n}_0\) / <code>reference_normal_c</code></td><td>3</td><td>\(C\)</td><td>unitless</td><td>Reference-plane normal.</td></tr>
+<tr><td>\({}^{C}_{I}\hat q\) / <code>attitude</code></td><td>4</td><td>\(I\rightarrow C\)</td><td>unitless</td><td>Current estimated orientation relative to bench calibration.</td></tr>
+<tr><td>\({}^{I}\hat{\mathbf v}\) / <code>accel_predicted_dir</code></td><td>3</td><td>\(I\)</td><td>unitless</td><td>Predicted calibration acceleration direction expressed in current IMU coordinates.</td></tr>
+<tr><td>\({}^{I}\mathbf e_{raw}\)</td><td>3</td><td>\(I\)</td><td>unitless</td><td>Cross-product innovation before confidence weighting.</td></tr>
+<tr><td>\({}^{I}\mathbf e_M\)</td><td>3</td><td>\(I\)</td><td>unitless</td><td>Innovation actually fed to the Mahony correction.</td></tr>
+<tr><td>\(\theta_s\)</td><td>1</td><td>relative plane</td><td>rad</td><td>Acute angle between current blade plane and reference plane.</td></tr>
+<tr><td>\(\theta_{target}\)</td><td>1</td><td>relative plane</td><td>rad</td><td>Desired sharpening angle.</td></tr>
+<tr><td>\(\Delta t\)</td><td>1</td><td>—</td><td>s</td><td>Elapsed time since previous IMU update.</td></tr>
+<tr><td>\(K_p,K_i\)</td><td>1 each</td><td>—</td><td>filter gains</td><td>Mahony proportional and integral/bias gains.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="calibration">
+<h2>4. Phase 1 — Bench-rest calibration</h2>
+<p><strong>Goal:</strong> establish a repeatable zero-angle reference, estimate startup gyro bias, identify the blade/reference-plane normal, and initialize the Mahony state.</p>
+
+<h3>4.1 Enter calibration only after stillness is detected</h3>
+<p>After the user requests calibration, wait until the device appears stationary, then start the five-second accumulation window. If stationarity is lost, discard that window and restart it.</p>
+For every candidate sample \(k\), compute
+\[
+\omega_{mag,k}=\left\|{}^{I}\boldsymbol\omega_{m,k}\right\|
+\]
+and
+\[
+a_{mag,k}=\left\|{}^{I}\mathbf a_{m,k}\right\|.
+\]
+<p>Exact stillness thresholds are empirical constants rather than part of Mahony itself. Log these values so they can be tuned from real hardware.</p>
+
+<h3>4.2 Average \(N\) stationary samples</h3>
+<p>At 200 Hz for five seconds, \(N\approx1000\). A running sum is sufficient; all samples do not need to be stored.</p>
+\[
+{}^{I}\bar{\boldsymbol\omega}
+=
+\frac{1}{N}\sum_{k=1}^{N}{}^{I}\boldsymbol\omega_{m,k}
+\]
+\[
+{}^{I}\bar{\mathbf a}
+=
+\frac{1}{N}\sum_{k=1}^{N}{}^{I}\mathbf a_{m,k}.
+\]
+
+<h3>4.3 Startup gyro bias</h3>
+\[
+\boxed{{}^{I}\mathbf b_0={}^{I}\bar{\boldsymbol\omega}}
+\]
+<p>Because the device is stationary during calibration, the true angular rate is approximately zero. Therefore the average measured gyro output is the startup bias estimate.</p>
+
+<h3>4.4 Calibration acceleration magnitude and direction</h3>
+\[
+a_0=\left\|{}^{I}\bar{\mathbf a}\right\|
+\]
+\[
+{}^{C}\hat{\mathbf g}=\frac{{}^{I}\bar{\mathbf a}}{a_0}.
+\]
+<p>At calibration completion, \(C\equiv I_0\). Under the required flat-and-level calibration pose, the normalized acceleration direction is perpendicular to the blade/reference plane. Therefore store:</p>
+\[
+{}^{I}\hat{\mathbf n}_{blade}={}^{C}\hat{\mathbf g}
+\]
+\[
+{}^{C}\hat{\mathbf n}_0={}^{C}\hat{\mathbf g}.
+\]
+<div class="callout good"><strong>Why this removes mounting-angle dependence.</strong> If the blade face is flat and level, the stationary accelerometer direction is perpendicular to the blade plane. The measured unit vector therefore tells us the blade-normal direction in the sensor's own axes even if the IMU package is not mounted perfectly square to the blade.</div>
+
+<h3>4.5 Initialize quaternion and residual-bias state</h3>
+<p>At calibration completion, by definition the current body frame and calibration frame are identical:</p>
+\[
+\boxed{{}^{C}_{I}\hat q_0=\begin{bmatrix}1&0&0&0\end{bmatrix}^T}
+\]
+\[
+{}^{I}\mathbf b_r=\begin{bmatrix}0&0&0\end{bmatrix}^T,
+\qquad
+w_{acc}=1.
+\]
+
+<h3>4.6 Persistent outputs of calibration</h3>
+<table>
+<thead><tr><th>State</th><th>Initial value / calculation</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>\({}^{I}\mathbf b_0\)</td><td>mean stationary gyro</td><td>Remove most gyro bias immediately.</td></tr>
+<tr><td>\(a_0\)</td><td>\(\|\text{mean stationary accel}\|\)</td><td>Reference acceleration magnitude for confidence weighting.</td></tr>
+<tr><td>\({}^{C}\hat{\mathbf g}\)</td><td>normalize(mean stationary accel)</td><td>Fixed gravity/specific-force reference used by Mahony.</td></tr>
+<tr><td>\({}^{I}\hat{\mathbf n}_{blade}\)</td><td>\({}^{C}\hat{\mathbf g}\)</td><td>Body-fixed blade normal used for geometric angle calculation.</td></tr>
+<tr><td>\({}^{C}\hat{\mathbf n}_0\)</td><td>\({}^{C}\hat{\mathbf g}\)</td><td>Reference-plane normal.</td></tr>
+<tr><td>\({}^{C}_{I}\hat q\)</td><td>\([1,0,0,0]\)</td><td>Initial relative attitude.</td></tr>
+<tr><td>\({}^{I}\mathbf b_r\)</td><td>\([0,0,0]\)</td><td>Residual online bias correction.</td></tr>
+<tr><td>\(w_{acc}\)</td><td>1</td><td>Initial accelerometer trust.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="target">
+<h2>5. Phase 2 — Raise blade and acquire the desired target angle</h2>
+<p>There is no separate attitude algorithm in this phase. Immediately after calibration, run the normal Mahony update loop in Section 6 at every IMU sample. The user raises the blade; the quaternion tracks the full 3D motion; the sharpening angle is computed geometrically after each update.</p>
+
+<h3>5.1 Current blade normal in the fixed calibration frame</h3>
+<p>\({}^{I}\hat{\mathbf n}_{blade}\) is a constant body-fixed unit vector identified during calibration. Rotate it with the current attitude estimate:</p>
+\[
+{}^{C}\hat{\mathbf n}
+=
+\operatorname{normalize}
+\left(
+\operatorname{rotate}_{I\rightarrow C}
+\left({}^{C}_{I}\hat q,{}^{I}\hat{\mathbf n}_{blade}\right)
+\right).
+\]
+
+<h3>5.2 Geometric sharpening angle — no Euler angles</h3>
+<p>The sharpening angle is the acute dihedral angle between the current blade plane and the calibrated reference plane. Plane normals make the calculation direct.</p>
+\[
+c=\operatorname{clamp}\left({}^{C}\hat{\mathbf n}_0\cdot{}^{C}\hat{\mathbf n},-1,+1\right)
+\]
+\[
+s=\left\|{}^{C}\hat{\mathbf n}_0\times{}^{C}\hat{\mathbf n}\right\|
+\]
+\[
+\boxed{\theta_s=\operatorname{atan2}\left(s,|c|\right)}.
+\]
+<p>\(\theta_s\in[0,\pi/2]\). Convert to degrees only for display:</p>
+\[
+\theta_{s,deg}=\theta_s\frac{180}{\pi}.
+\]
+<div class="callout"><strong>Why \(|c|\) is used.</strong> A plane has no intrinsic “front” normal. \(\mathbf n\) and \(-\mathbf n\) describe the same plane. The absolute dot product returns the acute plane-to-plane angle and remains valid if the knife is flipped to sharpen the opposite side.</div>
+
+<h3>5.3 Why this is cleaner than Euler pitch/roll</h3>
+<ul>
+  <li>No rotation order is chosen, so there is no Euler-order coupling.</li>
+  <li>No gimbal singularity is introduced by the output calculation.</li>
+  <li>Intentional handle/belly-following motion may be a compound 3D rotation. If the blade plane remains at the same angle to the stone, \(\theta_s\) remains constant regardless of the normal's azimuth.</li>
+  <li>The 6-DOF system's unobservable yaw about gravity does not directly harm \(\theta_s\), because rotating the current plane normal around the reference normal preserves their mutual angle.</li>
+</ul>
+
+<h3>5.4 Set the target</h3>
+<p>Support either workflow:</p>
+<ul>
+  <li><strong>Manual target:</strong> phone sends an angle, e.g. \(\theta_{target}=15^\circ=15\pi/180\ \mathrm{rad}\).</li>
+  <li><strong>Capture target:</strong> user raises the knife to the desired displayed angle and presses Set Target; firmware stores \(\theta_{target}=\theta_s\).</li>
+</ul>
+<p>Do not reset the quaternion when setting the target. Bench-rest calibration remains the zero reference for the entire run.</p>
+</section>
+
+<section id="maintenance">
+<h2>6. Phase 3 — Mahony maintenance/update loop</h2>
+<p>This same loop actually runs throughout Phases 2 and 3. Phase 3 simply adds comparison to \(\theta_{target}\) and audio/UI logic.</p>
+
+<h3>6.1 Read one time-aligned IMU sample</h3>
+<ul>
+  <li>\({}^{I}\mathbf a_m\): measured accelerometer vector, m/s², current body frame.</li>
+  <li>\({}^{I}\boldsymbol\omega_m\): measured gyro vector, converted to rad/s, current body frame.</li>
+  <li>\(\Delta t\): measured elapsed time since prior update, seconds.</li>
+</ul>
+
+<h3>6.2 Validate and normalize accelerometer</h3>
+\[
+a_{mag}=\left\|{}^{I}\mathbf a_m\right\|
+\]
+\[
+{}^{I}\hat{\mathbf a}=\frac{{}^{I}\mathbf a_m}{a_{mag}}.
+\]
+<p>If \(a_{mag}\) is below a small safety epsilon, skip accelerometer correction for this update. Do not normalize a near-zero vector.</p>
+
+<h3>6.3 Predict the fixed calibration reference in the current IMU frame</h3>
+<p>\({}^{C}\hat{\mathbf g}\) is fixed from calibration. Since \({}^{C}_{I}\hat q\) maps \(I\rightarrow C\), its conjugate maps \(C\rightarrow I\):</p>
+\[
+{}^{I}\hat{\mathbf v}
+=
+\operatorname{normalize}
+\left(
+\operatorname{rotate}_{C\rightarrow I}
+\left({}^{C}_{I}\hat q,{}^{C}\hat{\mathbf g}\right)
+\right)
+\]
+or explicitly,
+\[
+{}^{I}\hat{\mathbf v}
+=
+\operatorname{normalize}
+\left[
+\operatorname{vector\_part}
+\left(
+q^*\otimes[0,{}^{C}\hat{\mathbf g}]\otimes q
+\right)
+\right].
+\]
+<p>Interpretation: this is where the current quaternion estimate says the calibration acceleration direction should appear in current sensor coordinates.</p>
+
+<h3>6.4 Compute adaptive accelerometer confidence</h3>
+<p>This confidence policy is a project-specific wrapper around Mahony. It reduces accelerometer influence when knife translation makes the measurement inconsistent with the predicted gravity/reference vector.</p>
+\[
+{}^{I}\mathbf a_{expected}=a_0\,{}^{I}\hat{\mathbf v}
+\]
+\[
+{}^{I}\mathbf r_{acc}={}^{I}\mathbf a_m-{}^{I}\mathbf a_{expected}
+\]
+\[
+\boxed{\rho=\frac{\left\|{}^{I}\mathbf r_{acc}\right\|}{a_0}}.
+\]
+<p>\(\rho\) is dimensionless. Because it uses the full vector residual, it can detect lateral linear acceleration that barely changes total \(|\mathbf a|\).</p>
+
+<p><strong>Recommended initial candidate-weight schedule:</strong></p>
+\[
+\rho_{full}=0.05,\qquad
+\rho_{soft}=0.20,\qquad
+\rho_{hard}=0.35.
+\]
+<p>For \(\rho\le\rho_{full}\):</p>
+\[
+w_{candidate}=1.
+\]
+<p>For \(\rho_{full}<\rho<\rho_{soft}\):</p>
+\[
+x=\frac{\rho-\rho_{full}}{\rho_{soft}-\rho_{full}}
+\]
+\[
+S(x)=3x^2-2x^3
+\]
+\[
+w_{candidate}=1-0.90S(x).
+\]
+<p>For \(\rho_{soft}\le\rho<\rho_{hard}\):</p>
+\[
+w_{candidate}=0.10.
+\]
+<p>For \(\rho\ge\rho_{hard}\), an invalid accelerometer norm, or an obviously corrupt measurement:</p>
+\[
+w_{candidate}=0.
+\]
+<div class="callout"><strong>Why keep a 0.10 floor in the soft-reject region?</strong> A full-vector residual also grows if the attitude estimate itself becomes wrong. Keeping a small correction path helps the filter recover instead of becoming permanently locked out. Only severe measurements use \(w=0\).</div>
+
+<h4>Fast rejection, slow recovery</h4>
+<p>If candidate confidence is lower than current confidence, reject immediately:</p>
+\[
+w_{candidate}<w_{acc}\quad\Rightarrow\quad w_{acc}\leftarrow w_{candidate}.
+\]
+<p>If confidence is recovering, use a first-order recovery:</p>
+\[
+\alpha=\frac{\Delta t}{\tau_{recover}+\Delta t}
+\]
+\[
+w_{acc}\leftarrow w_{acc}+\alpha\left(w_{candidate}-w_{acc}\right)
+\]
+with initial test value
+\[
+\boxed{\tau_{recover}=0.15\ \mathrm{s}}.
+\]
+
+<h3>6.5 Compute Mahony innovation</h3>
+\[
+\boxed{{}^{I}\mathbf e_{raw}={}^{I}\hat{\mathbf a}\times{}^{I}\hat{\mathbf v}}
+\]
+<p>This <strong>is a 3D vector cross product</strong>. Both inputs are normalized unit vectors expressed in the current body frame.</p>
+\[
+{}^{I}\mathbf e_M=w_{acc}\,{}^{I}\mathbf e_{raw}.
+\]
+<p>This second operation is ordinary scalar-vector multiplication.</p>
+
+<h3>6.6 Update residual gyro-bias estimate</h3>
+<p>Only let the integral/bias estimator learn from high-confidence accelerometer data:</p>
+\[
+\text{if }w_{acc}\ge0.80\text{ and }\rho\le0.05:
+\qquad
+{}^{I}\mathbf b_r
+\leftarrow
+{}^{I}\mathbf b_r-K_i{}^{I}\mathbf e_M\Delta t.
+\]
+<p>Otherwise \({}^{I}\mathbf b_r\) is unchanged.</p>
+<p>Use anti-windup by clamping each residual-bias component to \(\pm b_{r,max}\). Initial test value:</p>
+\[
+\boxed{b_{r,max}=0.05\ \mathrm{rad/s}\approx2.86^\circ/\mathrm{s}}.
+\]
+
+<h3>6.7 Correct the gyro</h3>
+\[
+\boxed{
+{}^{I}\boldsymbol\omega_c
+=
+{}^{I}\boldsymbol\omega_m
+-{}^{I}\mathbf b_0
+-{}^{I}\mathbf b_r
++K_p{}^{I}\mathbf e_M
+}.
+\]
+<p>Every term is a three-vector in the current sensor axes. The result remains in rad/s.</p>
+
+<h3>6.8 Convert corrected angular rate to quaternion derivative</h3>
+Construct the pure angular-rate quaternion
+\[
+\Omega_I=
+\begin{bmatrix}
+0&\omega_{c,x}&\omega_{c,y}&\omega_{c,z}
+\end{bmatrix}^T.
+\]
+Then
+\[
+\boxed{
+\dot q=\frac12\left(q\otimes\Omega_I\right)
+}.
+\]
+<p>\(\otimes\) is Hamilton quaternion multiplication. \(\dot q\) is a rate of change of orientation, not an orientation itself.</p>
+
+<h3>6.9 Integrate and normalize quaternion</h3>
+Using first-order Euler integration:
+\[
+q_{temp}=q_t+\dot q\,\Delta t
+\]
+\[
+\boxed{q_{t+1}=\frac{q_{temp}}{\|q_{temp}\|}}.
+\]
+<p>The addition and scalar multiplication here are component-wise operations on all four quaternion components.</p>
+
+<h3>6.10 Compute geometric sharpening angle</h3>
+\[
+{}^{C}\hat{\mathbf n}
+=
+\operatorname{normalize}
+\left(
+\operatorname{rotate}_{I\rightarrow C}
+(q,{}^{I}\hat{\mathbf n}_{blade})
+\right)
+\]
+\[
+c=\operatorname{clamp}\left({}^{C}\hat{\mathbf n}_0\cdot{}^{C}\hat{\mathbf n},-1,+1\right)
+\]
+\[
+s=\left\|{}^{C}\hat{\mathbf n}_0\times{}^{C}\hat{\mathbf n}\right\|
+\]
+\[
+\boxed{\theta_s=\operatorname{atan2}(s,|c|)}.
+\]
+<p>This scalar is the application output. It is not an Euler angle.</p>
+</section>
+
+<section id="tone">
+<h2>7. Application error and tone logic</h2>
+\[
+\boxed{e_\theta=\theta_s-\theta_{target}}.
+\]
+<p>Do not confuse \(e_\theta\) with the three-axis Mahony innovation \({}^{I}\mathbf e_M\).</p>
+<pre>if angle_error &lt; -deadband_rad:
+    tone = LOW
+elif angle_error &gt; deadband_rad:
+    tone = HIGH
+else:
+    tone = SILENT</pre>
+<p>Deadband is a product/UX parameter and should be tuned after actual angle-noise characterization.</p>
+</section>
+
+<section id="pseudocode">
+<h2>8. Complete execution-order pseudocode</h2>
+<pre>// ---------- CALIBRATION ----------
+wait_until_stationary();
+collect_stationary_samples_for_5_seconds();
+
+b0_I      = mean(gyro_samples_rad_s);
+a_bar_I   = mean(accel_samples_m_s2);
+a0        = norm(a_bar_I);
+g_hat_C   = normalize(a_bar_I);
+n_blade_I = g_hat_C;
+n0_C      = g_hat_C;
+
+q_CI      = Quat(1.0, 0.0, 0.0, 0.0);
+b_r_I     = Vec3(0.0, 0.0, 0.0);
+w_acc     = 1.0;
+
+// ---------- EVERY IMU SAMPLE ----------
+a_m_I      = read_accel_m_s2();
+omega_m_I  = read_gyro_rad_s();
+dt         = measured_dt_seconds();
+
+// A. normalized measured acceleration
+a_mag       = norm(a_m_I);
+a_hat_I     = normalize(a_m_I);       // only if valid
+
+// B. predicted calibration gravity direction in current body frame
+v_hat_I     = rotate_C_to_I(q_CI, g_hat_C);
+v_hat_I     = normalize(v_hat_I);
+
+// C. adaptive accelerometer trust
+a_expected  = a0 * v_hat_I;
+r_acc_I     = a_m_I - a_expected;
+rho         = norm(r_acc_I) / a0;
+w_candidate = accel_weight_from_rho(rho);
+w_acc       = fast_reject_slow_recover(w_acc, w_candidate, dt);
+
+// D. Mahony innovation (VECTOR CROSS PRODUCT)
+e_raw_I     = cross(a_hat_I, v_hat_I);
+e_M_I       = w_acc * e_raw_I;
+
+// E. online residual gyro-bias estimate
+if w_acc >= 0.80 &amp;&amp; rho <= 0.05 {
+    b_r_I -= Ki * e_M_I * dt;
+    b_r_I  = component_clamp(b_r_I, -b_r_max, +b_r_max);
+}
+
+// F. corrected gyro
+omega_c_I = omega_m_I - b0_I - b_r_I + Kp * e_M_I;
+
+// G. quaternion propagation (HAMILTON PRODUCT)
+Omega_I = Quat(0.0, omega_c_I.x, omega_c_I.y, omega_c_I.z);
+q_dot   = 0.5 * hamilton(q_CI, Omega_I);
+q_CI    = normalize(q_CI + q_dot * dt);
+
+// H. geometric sharpening angle
+n_C       = normalize(rotate_I_to_C(q_CI, n_blade_I));
+dot_n     = clamp(dot(n0_C, n_C), -1.0, +1.0);
+cross_n   = norm(cross(n0_C, n_C));
+theta_s   = atan2(cross_n, abs(dot_n));
+
+// I. application comparison
+angle_error = theta_s - theta_target;
+update_audio_feedback(angle_error);</pre>
+</section>
+
+<section id="rust">
+<h2>9. Rust-oriented data model recommendation</h2>
+<pre>struct Vec3 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+struct Quat {
+    w: f32,
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+struct Calibration {
+    gyro_bias_start: Vec3,      // b0_I, rad/s
+    accel_mag_ref: f32,         // a0, m/s^2
+    accel_ref_c: Vec3,          // g_hat_C, unit
+    blade_normal_body: Vec3,    // n_blade_I, unit
+    reference_normal_c: Vec3,   // n0_C, unit
+}
+
+struct MahonyState {
+    q_c_i: Quat,                // unit quaternion, I -> C
+    gyro_bias_residual: Vec3,   // b_r_I, rad/s
+    accel_weight: f32,          // w_acc in [0,1]
+}
+
+struct FilterConfig {
+    kp: f32,                    // initial 0.5
+    ki: f32,                    // initial 0.0
+    rho_full: f32,              // initial 0.05
+    rho_soft_reject: f32,       // initial 0.20
+    rho_hard_reject: f32,       // initial 0.35
+    accel_recovery_tau_s: f32,  // initial 0.15
+    bias_residual_max_rad_s: f32, // initial 0.05
+}</pre>
+</section>
+
+<section id="safeguards">
+<h2>10. Numerical safeguards and invariants</h2>
+<table>
+<thead><tr><th>Check</th><th>Required behavior</th></tr></thead>
+<tbody>
+<tr><td>Quaternion norm</td><td>Normalize \({}^{C}_{I}\hat q\) after every integration step. Assert/log if the pre-normalized norm is wildly far from 1.</td></tr>
+<tr><td>Accelerometer norm</td><td>Never normalize near-zero acceleration. Set accelerometer confidence to 0 for invalid samples.</td></tr>
+<tr><td>Dot product</td><td>Clamp \(c\) to \([-1,+1]\) to protect against floating-point overshoot.</td></tr>
+<tr><td>\(\Delta t\) sanity</td><td>Reject or clamp absurd update intervals caused by scheduling stalls; log them.</td></tr>
+<tr><td>Gyro units</td><td>Convert sensor deg/s to rad/s exactly once at the driver boundary.</td></tr>
+<tr><td>Quaternion order</td><td>Use \([w,x,y,z]\) everywhere, including tests and BLE/log payload documentation.</td></tr>
+<tr><td>Integral windup</td><td>Freeze residual-bias learning at low confidence and clamp \({}^{I}\mathbf b_r\).</td></tr>
+<tr><td>NaN / infinity</td><td>If any state becomes non-finite, stop audio guidance and require/restart calibration rather than continuing with corrupt state.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="tuning">
+<h2>11. Gain and weighting tuning plan</h2>
+<p>The values below are <strong>initial test values</strong>, not universal constants. Keep them in the implementation so you have a rational place to start, then tune from logged real motions.</p>
+<div class="callout good"><strong>Recommended tuning order.</strong> Validate calibration first, then tune \(K_p\) with \(K_i=0\), then tune accelerometer-confidence thresholds, then introduce only enough \(K_i\) to correct residual long-term drift, and finally tune recovery timing. Changing several families at once makes symptoms difficult to diagnose.</div>
+
+<table class="tune-table">
+<thead><tr><th>Parameter</th><th>Initial value</th><th>What it controls</th><th>If you observe this...</th><th>Adjustment</th><th>A good value looks like...</th></tr></thead>
+<tbody>
+<tr>
+<td>\(K_p\)</td><td>0.5</td><td>Immediate accelerometer-derived attitude correction.</td>
+<td>After a controlled angle change, the estimate takes too long to settle to the correct static angle.</td>
+<td><span class="direction-up">Increase \(K_p\).</span></td>
+<td rowspan="2">The estimate converges quickly after a real orientation change, but remains smooth and is not visibly kicked by ordinary sharpening acceleration. Increasing it further gives little useful settling improvement and begins to increase jitter or motion sensitivity.</td>
+</tr>
+<tr>
+<td>\(K_p\)</td><td>0.5 baseline</td><td>Same.</td>
+<td>The angle is jittery while stationary, or stroke acceleration creates obvious short-lived angle corrections even though the blade angle did not really change.</td>
+<td><span class="direction-down">Decrease \(K_p\).</span></td>
+</tr>
+
+<tr>
+<td>\(K_i\)</td><td>0 initially; then try 0.001, 0.005, 0.01, 0.02, 0.05</td><td>Slow residual gyro-bias learning.</td>
+<td>With good startup calibration, a long stationary hold still develops a slow persistent drift that \(K_p\) alone does not eliminate satisfactorily.</td>
+<td><span class="direction-up">Increase \(K_i\) slightly.</span></td>
+<td rowspan="2">Long stationary holds do not drift materially, while dynamic motion does not create a persistent post-motion offset. Use the smallest \(K_i\) that removes meaningful residual drift.</td>
+</tr>
+<tr>
+<td>\(K_i\)</td><td>small</td><td>Same.</td>
+<td>After dynamic strokes, the angle acquires a persistent offset, slowly wanders, or takes an unusually long time to recover because the bias estimator has learned bad acceleration-induced error.</td>
+<td><span class="direction-down">Decrease \(K_i\).</span></td>
+</tr>
+
+<tr>
+<td>\(\rho_{full}\)</td><td>0.05</td><td>Residual below which accelerometer data receives full trust.</td>
+<td>Ordinary calm motion frequently leaves full-confidence mode even though the angle estimate is behaving correctly.</td>
+<td><span class="direction-up">Increase \(\rho_{full}\).</span></td>
+<td rowspan="2">Stationary and gentle motion remain at or near full confidence, but the filter begins reducing trust before nongravitational acceleration can produce visible angle errors.</td>
+</tr>
+<tr>
+<td>\(\rho_{full}\)</td><td>0.05 baseline</td><td>Same.</td>
+<td>Acceleration is visibly disturbing the reported angle while \(w_{acc}\) is still staying at 1.0.</td>
+<td><span class="direction-down">Decrease \(\rho_{full}\).</span></td>
+</tr>
+
+<tr>
+<td>\(\rho_{soft}\)</td><td>0.20</td><td>Point by which confidence has faded to the 0.10 floor.</td>
+<td>Moderate stroke/reversal accelerations are still being trusted too strongly and causing transient angle errors.</td>
+<td><span class="direction-down">Decrease \(\rho_{soft}\).</span></td>
+<td rowspan="2">Moderate acceleration is clearly downweighted before it corrupts attitude, but normal sharpening motion does not spend unnecessary time near the confidence floor.</td>
+</tr>
+<tr>
+<td>\(\rho_{soft}\)</td><td>0.20 baseline</td><td>Same.</td>
+<td>Normal sharpening motion spends too much time at very low accelerometer confidence even though the measured angle remains physically trustworthy.</td>
+<td><span class="direction-up">Increase \(\rho_{soft}\).</span></td>
+</tr>
+
+<tr>
+<td>\(\rho_{hard}\)</td><td>0.35</td><td>Residual at which the accelerometer is completely rejected.</td>
+<td>Sharp stroke reversals still produce obvious accelerometer-driven angle spikes before rejection occurs.</td>
+<td><span class="direction-down">Decrease \(\rho_{hard}\).</span></td>
+<td rowspan="2">Severe translational events are rejected quickly, while ordinary motion rarely reaches full rejection. Gyro-only intervals are brief and intentional.</td>
+</tr>
+<tr>
+<td>\(\rho_{hard}\)</td><td>0.35 baseline</td><td>Same.</td>
+<td>The accelerometer is being completely rejected during common, nonproblematic sharpening motion, leaving excessive gyro-only operation.</td>
+<td><span class="direction-up">Increase \(\rho_{hard}\).</span></td>
+</tr>
+
+<tr>
+<td>\(\tau_{recover}\)</td><td>0.15 s</td><td>How cautiously accelerometer confidence returns after a disturbance.</td>
+<td>After a reversal, trust returns so quickly that a second visible correction/kick occurs before the acceleration transient has actually settled.</td>
+<td><span class="direction-up">Increase \(\tau_{recover}\).</span></td>
+<td rowspan="2">Confidence drops immediately on bad data, then returns smoothly as motion settles, without a secondary kick and without a perceptible long delay.</td>
+</tr>
+<tr>
+<td>\(\tau_{recover}\)</td><td>0.15 s baseline</td><td>Same.</td>
+<td>The blade has clearly returned to steady motion or rest but \(w_{acc}\) remains suppressed noticeably longer than necessary.</td>
+<td><span class="direction-down">Decrease \(\tau_{recover}\).</span></td>
+</tr>
+
+<tr>
+<td>\(b_{r,max}\)</td><td>0.05 rad/s</td><td>Safety bound on learned residual gyro bias.</td>
+<td>Logs show the residual bias repeatedly hitting the clamp during valid long stationary runs, while independent gyro data confirms a larger real residual bias.</td>
+<td><span class="direction-up">Increase the bound cautiously.</span></td>
+<td rowspan="2">Normal learned residual bias stays comfortably inside the bound; the clamp acts only as a fault/anti-windup guard rather than a routine operating limit.</td>
+</tr>
+<tr>
+<td>\(b_{r,max}\)</td><td>0.05 rad/s baseline</td><td>Same.</td>
+<td>A bad dynamic event can drive the learned bias to implausibly large values before the clamp catches it.</td>
+<td><span class="direction-down">Decrease the bound.</span></td>
+</tr>
+</tbody>
+</table>
+
+<h3>11.1 How to know when tuning is “good”</h3>
+<p>A good value is generally found at the boundary between two failure modes, not at an arbitrary number. For \(K_p\), for example:</p>
+\[
+\text{too low: sluggish correction}
+\quad\longrightarrow\quad
+\boxed{\text{useful operating region}}
+\quad\longrightarrow\quad
+\text{too high: noisy / acceleration-sensitive correction}.
+\]
+<p>The desired value is the one that meets your response requirement while leaving margin before the opposite failure mode appears. Similar logic applies to every threshold and gain.</p>
+
+<h3>11.2 Controlled tuning tests</h3>
+<div class="diag"><p><strong>Test A — Static repeatability.</strong> Place the blade at mechanically known angles multiple times.</p><p><strong>Good:</strong> the reported angle returns to the same value with low spread and no meaningful drift.</p><p><strong>If not:</strong> solve calibration/mechanical repeatability problems before tuning gains around them.</p></div>
+<div class="diag"><p><strong>Test B — Step response.</strong> Move from 0° to a known angle, stop, and log the settling transient.</p><p><strong>Too slow:</strong> increase \(K_p\).</p><p><strong>Jittery/oversensitive:</strong> decrease \(K_p\).</p></div>
+<div class="diag"><p><strong>Test C — Long stationary hold.</strong> Hold the blade still for several minutes after startup calibration.</p><p><strong>Slow persistent drift:</strong> after confirming startup bias and \(K_p\), increase \(K_i\) slightly.</p><p><strong>Persistent bias after earlier motion:</strong> decrease \(K_i\) or tighten the confidence gate.</p></div>
+<div class="diag"><p><strong>Test D — Normal stroke.</strong> Perform realistic sharpening strokes while mechanically trying to preserve true angle.</p><p><strong>Angle disturbance while confidence stays high:</strong> lower \(\rho_{full}\) and/or \(\rho_{soft}\).</p><p><strong>Too much gyro-only time with otherwise clean data:</strong> raise the relevant threshold.</p></div>
+<div class="diag"><p><strong>Test E — Stroke reversal.</strong> Reverse direction deliberately and inspect \(\rho\), \(w_{acc}\), and \(\theta_s\).</p><p><strong>Spike before rejection:</strong> lower \(\rho_{hard}\) or \(\rho_{soft}\).</p><p><strong>Second kick on recovery:</strong> increase \(\tau_{recover}\).</p><p><strong>Recovery feels delayed after motion is clearly calm:</strong> decrease \(\tau_{recover}\).</p></div>
+<div class="diag"><p><strong>Test F — Aggressive-motion rejection.</strong> Exaggerate linear accelerations while keeping the intended blade angle as constant as practical.</p><p><strong>Good:</strong> confidence falls, the estimator propagates primarily from the gyro during the transient, and the sharpening-angle trace does not falsely follow the linear acceleration.</p></div>
+
+<h3>11.3 What to log during tuning</h3>
+<p>At minimum log: raw accel XYZ, raw gyro XYZ, startup bias, residual bias, \(\rho\), \(w_{candidate}\), \(w_{acc}\), raw Mahony innovation XYZ, weighted innovation XYZ, quaternion, \(\theta_s\), target angle, angle error, and \(\Delta t\). Without these signals, two different failure mechanisms can look identical in the final angle trace.</p>
+</section>
+
+<section id="tests">
+<h2>12. Sanity tests that should pass before hardware integration</h2>
+<table>
+<thead><tr><th>Test</th><th>Input / setup</th><th>Expected result</th></tr></thead>
+<tbody>
+<tr><td>Identity after calibration</td><td>\(q=[1,0,0,0]\)</td><td>\(\theta_s=0\); predicted \({}^{I}\hat{\mathbf v}={}^C\hat{\mathbf g}\) numerically because \(C=I\); Mahony cross-product error ≈ 0.</td></tr>
+<tr><td>15° tilt</td><td>Synthetic quaternion representing 15° rotation about any axis lying in the reference plane</td><td>\(\theta_s\approx15^\circ\).</td></tr>
+<tr><td>Pure rotation about blade normal</td><td>Rotate around \({}^{I}\hat{\mathbf n}_{blade}\)</td><td>\(\theta_s\) remains ≈ 0°.</td></tr>
+<tr><td>Same inclination, changed azimuth</td><td>Construct two normals on a 15° cone around \({}^{C}\hat{\mathbf n}_0\)</td><td>Both return \(\theta_s\approx15^\circ\).</td></tr>
+<tr><td>Quaternion normalization</td><td>Perturb quaternion norm slightly and normalize</td><td>Final \(\|q\|\approx1\).</td></tr>
+<tr><td>Bad accel sample</td><td>\(\rho\ge\rho_{hard}\)</td><td>\(w_{candidate}=0\); orientation propagates from gyro without accel correction for that update.</td></tr>
+<tr><td>Low-confidence integral freeze</td><td>\(w_{acc}<0.80\)</td><td>\({}^{I}\mathbf b_r\) does not change.</td></tr>
+<tr><td>Opposite normal / flipped side</td><td>\({}^{C}\hat{\mathbf n}\approx-{}^{C}\hat{\mathbf n}_0\)</td><td>\(\theta_s\approx0^\circ\) because the geometric plane is parallel.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="limitations">
+<h2>13. Important limitation of a 6-DOF IMU</h2>
+<p>Accelerometer + gyro alone cannot establish absolute heading about gravity. Mahony can stabilize gravity-referenced tilt, but yaw may drift. For this application that is largely benign: \(\theta_s\) depends on the angle between the current blade-plane normal and the calibrated reference-plane normal, and a pure rotation around the reference normal does not change that angle. If future features require absolute blade heading in the stone plane, an additional heading reference would be required.</p>
+</section>
+
+<section id="caveat">
+<h2>14. Calibration-surface caveat and fallback</h2>
+<div class="callout warn"><strong>Important.</strong> The arbitrary-mounting benefit depends on the blade being flat on a level reference plane during calibration, so the stationary accelerometer direction is also the blade-plane normal.</div>
+<p>If the final product must calibrate on a reference plane that may be significantly tilted relative to gravity, a single static 6-DOF measurement cannot simultaneously infer both gravity direction and an arbitrarily mounted blade-plane normal. In that case choose one of these designs:</p>
+<ul>
+  <li>enforce a known mechanical mounting relationship, such as sensor \(+Z\) accurately normal to the blade face, and use that known body vector as the blade normal; or</li>
+  <li>add another calibration pose/motion that identifies the blade frame relative to the IMU.</li>
+</ul>
+<p>For the initial prototype, a level flat calibration pose is the simplest architecture.</p>
+</section>
+
+<section id="source-v-project">
+<h2>15. Canonical Mahony math versus project-specific additions</h2>
+<table>
+<thead><tr><th>Part</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Gyro model, accelerometer gravity observation, quaternion kinematics, cross-product innovation, \(K_p/K_i\) bias estimator</td><td>Canonical Mahony / nonlinear complementary-filter concepts.</td></tr>
+<tr><td>Five-second startup gyro-bias averaging</td><td>Standard practical calibration technique.</td></tr>
+<tr><td>Calibration frame \(C\) with identity initial quaternion</td><td>Project coordinate convention.</td></tr>
+<tr><td>Geometric plane-normal sharpening angle</td><td>Project-specific output definition replacing Euler angles.</td></tr>
+<tr><td>Full-vector acceleration residual, confidence schedule, fast-reject/slow-recover, and confidence-gated integral learning</td><td>Project-specific robustness policy to validate empirically on real sharpening motion.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="references">
+<h2>16. References</h2>
+<ol>
+  <li>Nitin J. Sanket, “Mahony Filter” attitude-estimation tutorial: <a href="https://nitinjsanket.github.io/tutorials/attitudeest/mahony.html">nitinjsanket.github.io/tutorials/attitudeest/mahony.html</a></li>
+  <li>AHRS documentation, “Mahony Orientation Filter”: <a href="https://ahrs.readthedocs.io/en/latest/filters/mahony.html">ahrs.readthedocs.io/en/latest/filters/mahony.html</a></li>
+  <li>R. Mahony, T. Hamel, and J.-M. Pflimlin, “Nonlinear Complementary Filters on the Special Orthogonal Group,” <em>IEEE Transactions on Automatic Control</em>, 53(5), 2008, 1203–1217.</li>
+</ol>
+</section>
+
+<div class="callout good"><strong>Recommended next step.</strong> Treat the frame conventions, calibration assumption, and quaternion multiplication direction in this document as the mathematical contract. The Rust implementation and unit tests should be written directly against those definitions.</div>
+</main>
+<footer>
+Knife Sharpener project — mathematical schematic v0.3. Math is rendered at view time by MathJax 3 from jsDelivr using standard LaTeX delimiters.
+</footer>
+</div>
+</body>
+</html>
