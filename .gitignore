@@ -1,0 +1,63 @@
+# --- Rust / Cargo ---
+/target/
+**/target/
+# Cargo.lock should be committed for this workspace because it contains
+# executable applications/firmware and reproducible dependency resolution matters.
+
+# Rust tooling / generated diagnostics
+*.pdb
+*.profraw
+*.gcda
+*.gcno
+
+# --- ESP / embedded tooling ---
+.sdkconfig.old
+build/
+.esp-idf/
+managed_components/
+
+# --- Swift / Xcode ---
+.DS_Store
+DerivedData/
+.build/
+.swiftpm/
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+# Package.resolved should be committed for reproducible Swift package resolution.
+
+# Xcode build products
+build/
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# CocoaPods / Carthage (if ever used)
+Pods/
+Carthage/Build/
+
+# --- Editors / IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Logs / captures / local experiment output ---
+*.log
+recordings/*.csv
+recordings/*.json
+recordings/*.bin
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Misc generated files ---
+coverage/
+.tmp/
+tmp/
