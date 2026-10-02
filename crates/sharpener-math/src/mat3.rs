@@ -1,2 +1,2 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Quat(pub [f32; 4]);
+pub struct Mat3(pub [[f32; 3]; 3]);
