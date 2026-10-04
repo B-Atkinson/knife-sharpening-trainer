@@ -12,7 +12,7 @@ impl core::fmt::Display for Vec3Error {
         match self {
             Vec3Error::NormTooSmall(v) => write!(
                 f,
-                "vector x:{}, y:{}, z:{} produces norm of {}",
+                "vector x:{}, y:{}, z:{} produces norm of {} which is too small",
                 v.x,
                 v.y,
                 v.z,
@@ -28,6 +28,7 @@ pub struct Vec3 {
     pub y: f32,
     pub z: f32,
 }
+
 impl Add for Vec3 {
     type Output = Self;
 
