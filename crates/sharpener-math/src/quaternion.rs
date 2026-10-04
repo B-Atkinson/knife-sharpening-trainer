@@ -12,14 +12,14 @@ pub enum QuatError {
 impl core::fmt::Display for QuatError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            QuatError::InvalidCoefficients(w,x,y,z) => write!(
+            QuatError::InvalidCoefficients(w, x, y, z) => write!(
                 f,
                 "candidate coefficients w:{}, x:{}, y:{}, z:{} produces magnitude of {}",
                 w,
                 x,
                 y,
                 z,
-                libm::sqrtf(w*w + x*x + y*y + z*z)
+                libm::sqrtf(w * w + x * x + y * y + z * z)
             ),
             QuatError::NormTooSmall(q) => write!(
                 f,
@@ -28,7 +28,7 @@ impl core::fmt::Display for QuatError {
                 q.x,
                 q.y,
                 q.z,
-                libm::sqrtf(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z)
+                libm::sqrtf(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z)
             ),
         }
     }
@@ -103,7 +103,7 @@ impl Mul<f32> for Quat {
             w: self.w * rhs,
             x: self.x * rhs,
             y: self.y * rhs,
-            z: self.z * rhs
+            z: self.z * rhs,
         }
     }
 }
@@ -124,7 +124,7 @@ impl Div<f32> for Quat {
             w: self.w / rhs,
             x: self.x / rhs,
             y: self.y / rhs,
-            z: self.z / rhs
+            z: self.z / rhs,
         }
     }
 }
@@ -167,14 +167,12 @@ pub struct Quat {
     pub w: f32,
     pub x: f32,
     pub y: f32,
-    pub z: f32
+    pub z: f32,
 }
 
 impl Quat {
     pub fn new(w: f32, x: f32, y: f32, z: f32) -> Self {
-            Quat {
-                w, x, y, z
-            }
+        Quat { w, x, y, z }
     }
 
     pub fn try_new(w: f32, x: f32, y: f32, z: f32) -> Result<Self, QuatError> {
@@ -186,14 +184,10 @@ impl Quat {
         //         QuatError::InvalidCoefficients(w,x,y,z)
         //     );
         // }
-        Ok(
-            Quat {
-                w, x, y, z
-            }
-        )
+        Ok(Quat { w, x, y, z })
     }
 
-    pub fn from_array_wxyz(a: [f32;4]) -> Self {
+    pub fn from_array_wxyz(a: [f32; 4]) -> Self {
         Self {
             w: a[0],
             x: a[1],
@@ -207,11 +201,11 @@ impl Quat {
     }
 
     pub fn identity() -> Self {
-        Self{
+        Self {
             w: 1f32,
             x: 0f32,
             y: 0f32,
-            z: 0f32
+            z: 0f32,
         }
     }
 
@@ -220,7 +214,7 @@ impl Quat {
             w: 0f32,
             x: v.x,
             y: v.y,
-            z: v.z
+            z: v.z,
         }
     }
 
@@ -245,17 +239,40 @@ impl Quat {
     }
 
     pub fn normalize(self) -> Result<Self, QuatError> {
+        if !(self.w.is_finite() && self.x.is_finite() && self.y.is_finite() && self.z.is_finite()) {
+            return Err(QuatError::InvalidCoefficients(
+                self.w, self.x, self.y, self.z,
+            ));
+        }
+
         let n: f32 = self.norm();
+        if !n.is_finite() {
+            return Err(QuatError::InvalidCoefficients(
+                self.w, self.x, self.y, self.z,
+            ));
+        }
         if n <= 1e-11_f32 {
             return Err(QuatError::NormTooSmall(self));
         }
 
-        Ok(Self {
+        let normalized = Self {
             w: self.w / n,
             x: self.x / n,
             y: self.y / n,
             z: self.z / n,
-        })
+        };
+
+        if !(normalized.w.is_finite()
+            && normalized.x.is_finite()
+            && normalized.y.is_finite()
+            && normalized.z.is_finite())
+        {
+            return Err(QuatError::InvalidCoefficients(
+                self.w, self.x, self.y, self.z,
+            ));
+        }
+
+        Ok(normalized)
     }
 
     pub fn normalize_assign(&mut self) -> Result<(), QuatError> {
@@ -269,16 +286,19 @@ impl Quat {
             x: -1f32 * self.x,
             y: -1f32 * self.y,
             z: -1f32 * self.z,
-
         }
     }
 
-    pub fn rotate_i_to_c(self, u: Vec3) -> Vec3 {
+    pub fn rotate_unit_i_to_c(self, u: Vec3) -> Vec3 {
         (self * Quat::pure(u) * self.conjugate()).vector_part()
     }
 
-    pub fn rotate_c_to_i(self, v: Vec3) -> Vec3 {
-        (self.conjugate() * Quat::new(0f32, v.x, v.y, v.z) * self).vector_part()
+    pub fn rotate_unit_c_to_i(self, v: Vec3) -> Vec3 {
+        (self.conjugate() * Quat::pure(v) * self).vector_part()
+    }
+
+    pub fn derivative_from_body_rate(self, omega_i: Vec3) -> Self {
+        0.5_f32 * (self * Quat::pure(omega_i))
     }
 }
 
@@ -318,12 +338,15 @@ mod tests {
     fn test_new_allows_non_unit_quaternions() {
         let q = Quat::new(2.0_f32, -4.0_f32, 6.0_f32, -8.0_f32);
 
-        assert_eq!(q, Quat {
-            w: 2.0_f32,
-            x: -4.0_f32,
-            y: 6.0_f32,
-            z: -8.0_f32,
-        });
+        assert_eq!(
+            q,
+            Quat {
+                w: 2.0_f32,
+                x: -4.0_f32,
+                y: 6.0_f32,
+                z: -8.0_f32,
+            }
+        );
     }
 
     #[test]
@@ -446,6 +469,28 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_rejects_non_finite_coefficients_from_new() {
+        assert!(matches!(
+            Quat::new(f32::NAN, 0.0_f32, 0.0_f32, 0.0_f32).normalize(),
+            Err(QuatError::InvalidCoefficients(_, _, _, _))
+        ));
+        assert!(matches!(
+            Quat::new(0.0_f32, f32::INFINITY, 0.0_f32, 0.0_f32).normalize(),
+            Err(QuatError::InvalidCoefficients(_, _, _, _))
+        ));
+    }
+
+    #[test]
+    fn test_normalize_rejects_non_finite_norm() {
+        let q = Quat::new(f32::MAX, f32::MAX, f32::MAX, f32::MAX);
+
+        assert!(matches!(
+            q.normalize(),
+            Err(QuatError::InvalidCoefficients(_, _, _, _))
+        ));
+    }
+
+    #[test]
     fn test_normalize_assign_updates_in_place() {
         let mut q = Quat::new(0.0_f32, 3.0_f32, 4.0_f32, 0.0_f32);
 
@@ -477,10 +522,7 @@ mod tests {
         let q1 = Quat::new(1.0_f32, 2.0_f32, 3.0_f32, 4.0_f32);
         let q2 = Quat::new(0.5_f32, -1.0_f32, 2.0_f32, -3.0_f32);
 
-        assert_eq!(
-            q1 + q2,
-            Quat::new(1.5_f32, 1.0_f32, 5.0_f32, 1.0_f32)
-        );
+        assert_eq!(q1 + q2, Quat::new(1.5_f32, 1.0_f32, 5.0_f32, 1.0_f32));
     }
 
     #[test]
@@ -497,10 +539,7 @@ mod tests {
         let q1 = Quat::new(1.0_f32, 2.0_f32, 3.0_f32, 4.0_f32);
         let q2 = Quat::new(0.5_f32, -1.0_f32, 2.0_f32, -3.0_f32);
 
-        assert_eq!(
-            q1 - q2,
-            Quat::new(0.5_f32, 3.0_f32, 1.0_f32, 7.0_f32)
-        );
+        assert_eq!(q1 - q2, Quat::new(0.5_f32, 3.0_f32, 1.0_f32, 7.0_f32));
     }
 
     #[test]
@@ -516,24 +555,15 @@ mod tests {
     fn test_scalar_mul() {
         let q = Quat::new(1.0_f32, -2.0_f32, 3.0_f32, -4.0_f32);
 
-        assert_eq!(
-            q * 2.0_f32,
-            Quat::new(2.0_f32, -4.0_f32, 6.0_f32, -8.0_f32)
-        );
-        assert_eq!(
-            2.0_f32 * q,
-            Quat::new(2.0_f32, -4.0_f32, 6.0_f32, -8.0_f32)
-        );
+        assert_eq!(q * 2.0_f32, Quat::new(2.0_f32, -4.0_f32, 6.0_f32, -8.0_f32));
+        assert_eq!(2.0_f32 * q, Quat::new(2.0_f32, -4.0_f32, 6.0_f32, -8.0_f32));
     }
 
     #[test]
     fn test_scalar_div() {
         let q = Quat::new(2.0_f32, -4.0_f32, 6.0_f32, -8.0_f32);
 
-        assert_eq!(
-            q / 2.0_f32,
-            Quat::new(1.0_f32, -2.0_f32, 3.0_f32, -4.0_f32)
-        );
+        assert_eq!(q / 2.0_f32, Quat::new(1.0_f32, -2.0_f32, 3.0_f32, -4.0_f32));
     }
 
     #[test]
@@ -580,21 +610,21 @@ mod tests {
     }
 
     #[test]
-    fn test_rotate_i_to_c_identity() {
+    fn test_rotate_unit_i_to_c_identity() {
         let v = Vec3::new(1.0_f32, -2.0_f32, 3.0_f32);
 
-        assert_eq!(Quat::identity().rotate_i_to_c(v), v);
+        assert_eq!(Quat::identity().rotate_unit_i_to_c(v), v);
     }
 
     #[test]
-    fn test_rotate_c_to_i_identity() {
+    fn test_rotate_unit_c_to_i_identity() {
         let v = Vec3::new(1.0_f32, -2.0_f32, 3.0_f32);
 
-        assert_eq!(Quat::identity().rotate_c_to_i(v), v);
+        assert_eq!(Quat::identity().rotate_unit_c_to_i(v), v);
     }
 
     #[test]
-    fn test_rotate_i_to_c_90_degrees_about_z() {
+    fn test_rotate_unit_i_to_c_90_degrees_about_z() {
         let half_angle = core::f32::consts::FRAC_PI_4;
         let q = Quat::new(
             libm::cosf(half_angle),
@@ -604,13 +634,13 @@ mod tests {
         );
 
         assert_vec3_relative_eq(
-            q.rotate_i_to_c(Vec3::new(1.0_f32, 0.0_f32, 0.0_f32)),
+            q.rotate_unit_i_to_c(Vec3::new(1.0_f32, 0.0_f32, 0.0_f32)),
             Vec3::new(0.0_f32, 1.0_f32, 0.0_f32),
         );
     }
 
     #[test]
-    fn test_rotate_c_to_i_uses_conjugate_direction() {
+    fn test_rotate_unit_c_to_i_uses_conjugate_direction() {
         let half_angle = core::f32::consts::FRAC_PI_4;
         let q = Quat::new(
             libm::cosf(half_angle),
@@ -620,7 +650,7 @@ mod tests {
         );
 
         assert_vec3_relative_eq(
-            q.rotate_c_to_i(Vec3::new(0.0_f32, 1.0_f32, 0.0_f32)),
+            q.rotate_unit_c_to_i(Vec3::new(0.0_f32, 1.0_f32, 0.0_f32)),
             Vec3::new(1.0_f32, 0.0_f32, 0.0_f32),
         );
     }
@@ -636,7 +666,29 @@ mod tests {
         );
         let v = Vec3::new(1.0_f32, 2.0_f32, 3.0_f32);
 
-        assert_vec3_relative_eq(q.rotate_c_to_i(q.rotate_i_to_c(v)), v);
+        assert_vec3_relative_eq(q.rotate_unit_c_to_i(q.rotate_unit_i_to_c(v)), v);
+    }
+
+    #[test]
+    fn test_derivative_from_body_rate_matches_schematic_order() {
+        let q_ci = Quat::new(0.5_f32, 0.5_f32, 0.5_f32, 0.5_f32);
+        let omega_i = Vec3::new(1.0_f32, 2.0_f32, 3.0_f32);
+
+        assert_quat_relative_eq(
+            q_ci.derivative_from_body_rate(omega_i),
+            0.5_f32 * (q_ci * Quat::pure(omega_i)),
+        );
+    }
+
+    #[test]
+    fn test_derivative_from_body_rate_is_not_world_rate_order() {
+        let q_ci = Quat::new(0.5_f32, 0.5_f32, 0.5_f32, 0.5_f32);
+        let omega_i = Vec3::new(1.0_f32, 2.0_f32, 3.0_f32);
+
+        assert_ne!(
+            q_ci.derivative_from_body_rate(omega_i),
+            0.5_f32 * (Quat::pure(omega_i) * q_ci)
+        );
     }
 
     #[test]
@@ -651,9 +703,7 @@ mod tests {
 
     #[test]
     fn test_display_norm_too_small_error() {
-        let err = QuatError::NormTooSmall(Quat::new(
-            1e-12_f32, 0.0_f32, 0.0_f32, 0.0_f32,
-        ));
+        let err = QuatError::NormTooSmall(Quat::new(1e-12_f32, 0.0_f32, 0.0_f32, 0.0_f32));
         let message = std::format!("{}", err);
 
         assert!(message.contains("quaternion"));
