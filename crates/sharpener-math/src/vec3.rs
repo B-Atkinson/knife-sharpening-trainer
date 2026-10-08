@@ -1,11 +1,36 @@
+//! Three-dimensional vectors and their basic geometric operations.
+//!
+//! [`Vec3`] supports component-wise addition and subtraction, scalar
+//! multiplication and division, dot and cross products, norms, normalization,
+//! and component clamping. Constructors and arithmetic operators are unchecked;
+//! use the fallible methods when finite results are required.
+//!
+//! # Example
+//!
+//! ```
+//! use sharpener_math::vec3::Vec3;
+//!
+//! let x = Vec3::new(1.0, 0.0, 0.0);
+//! let y = Vec3::new(0.0, 1.0, 0.0);
+//!
+//! assert_eq!(x.cross(y), Vec3::new(0.0, 0.0, 1.0));
+//! assert_eq!(x.dot(y), 0.0);
+//! ```
+
 use approx::{AbsDiffEq, RelativeEq};
 use core::fmt::Formatter;
 use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 
+/// An error produced by a checked [`Vec3`] operation.
 #[derive(Debug)]
 pub enum Vec3Error {
+    /// The vector norm was at or below the normalization safety threshold.
     NormTooSmall(Vec3),
+
+    /// The vector contained a non-finite component or produced a non-finite norm.
     InvalidCoefficients(f32, f32, f32),
+
+    /// Clamp bounds were non-finite or the minimum exceeded the maximum.
     InvalidClampBounds(f32, f32),
 }
 
@@ -34,10 +59,19 @@ impl core::fmt::Display for Vec3Error {
     }
 }
 
+/// A three-dimensional vector with `f32` components.
+///
+/// `Vec3` does not attach a coordinate frame or physical unit to its values.
+/// Callers are responsible for keeping frame and unit conventions explicit.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec3 {
+    /// The x-axis component.
     pub x: f32,
+
+    /// The y-axis component.
     pub y: f32,
+
+    /// The z-axis component.
     pub z: f32,
 }
 
@@ -149,13 +183,21 @@ impl RelativeEq for Vec3 {
 }
 
 impl Vec3 {
+    /// Creates a vector without validating its components.
+    ///
+    /// This constructor permits `NaN` and infinite values.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
     }
+
+    /// Returns the dot product of this vector and `other`.
     pub fn dot(self, other: Vec3) -> f32 {
         (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
     }
 
+    /// Returns the right-handed cross product `self x other`.
+    ///
+    /// Reversing the operand order negates the result.
     pub fn cross(self, other: Vec3) -> Self {
         Self {
             x: (self.y * other.z) - (self.z * other.y),
@@ -164,14 +206,25 @@ impl Vec3 {
         }
     }
 
+    /// Returns the squared Euclidean norm of this vector.
+    ///
+    /// This avoids a square root and is useful for comparing magnitudes.
     pub fn norm_squared(&self) -> f32 {
         self.dot(*self)
     }
 
+    /// Returns the Euclidean norm of this vector.
     pub fn norm(&self) -> f32 {
         libm::sqrtf(self.norm_squared())
     }
 
+    /// Returns a unit vector pointing in the same direction as this vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Vec3Error::InvalidCoefficients`] if any component or the
+    /// computed norm is non-finite. Returns [`Vec3Error::NormTooSmall`] if the
+    /// norm is at or below `1e-11`.
     pub fn normalize(self) -> Result<Self, Vec3Error> {
         if !(self.x.is_finite() && self.y.is_finite() && self.z.is_finite()) {
             return Err(Vec3Error::InvalidCoefficients(self.x, self.y, self.z));
@@ -194,6 +247,13 @@ impl Vec3 {
         Ok(normalized)
     }
 
+    /// Clamps each component to the inclusive range `min..=max`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Vec3Error::InvalidCoefficients`] if this vector contains a
+    /// non-finite component. Returns [`Vec3Error::InvalidClampBounds`] if either
+    /// bound is non-finite or `min > max`.
     pub fn component_clamp(self, min: f32, max: f32) -> Result<Self, Vec3Error> {
         if !(self.x.is_finite() && self.y.is_finite() && self.z.is_finite()) {
             return Err(Vec3Error::InvalidCoefficients(self.x, self.y, self.z));

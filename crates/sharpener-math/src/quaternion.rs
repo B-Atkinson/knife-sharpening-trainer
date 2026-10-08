@@ -1,11 +1,34 @@
+//! Hamilton quaternions for attitude estimation and vector rotation.
+//!
+//! [`Quat`] stores components in `[w, x, y, z]` order. A unit quaternion used
+//! as an attitude maps vectors from the current IMU/body frame (`I`) into the
+//! calibration/reference frame (`C`) with `q * [0, v] * q.conjugate()`.
+//! Quaternion multiplication is the Hamilton product and is not commutative.
+//!
+//! # Example
+//!
+//! ```
+//! use sharpener_math::quaternion::Quat;
+//! use sharpener_math::vec3::Vec3;
+//!
+//! let attitude_i_to_c = Quat::identity();
+//! let body_vector = Vec3::new(1.0, 2.0, 3.0);
+//!
+//! assert_eq!(attitude_i_to_c.rotate_unit_i_to_c(body_vector), body_vector);
+//! ```
+
 use crate::vec3::Vec3;
 use approx::{AbsDiffEq, RelativeEq};
 use core::fmt::Formatter;
 use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 
+/// An error produced while validating or normalizing a [`Quat`].
 #[derive(Debug)]
 pub enum QuatError {
+    /// One or more coefficients, or the resulting norm, were non-finite.
     InvalidCoefficients(f32, f32, f32, f32),
+
+    /// The quaternion norm was at or below the normalization safety threshold.
     NormTooSmall(Quat),
 }
 
@@ -162,19 +185,43 @@ impl RelativeEq for Quat {
     }
 }
 
+/// A Hamilton quaternion stored in `[w, x, y, z]` component order.
+///
+/// The type can represent general quaternions as well as rotations. Methods
+/// whose names contain `rotate_unit` require `self` to be a unit quaternion;
+/// use [`Quat::normalize`] when that invariant has not already been established.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Quat {
+    /// The scalar component.
     pub w: f32,
+
+    /// The x component of the vector part.
     pub x: f32,
+
+    /// The y component of the vector part.
     pub y: f32,
+
+    /// The z component of the vector part.
     pub z: f32,
 }
 
 impl Quat {
+    /// Creates a quaternion in `[w, x, y, z]` order without validation.
+    ///
+    /// This constructor permits non-unit quaternions, `NaN`, and infinity.
     pub fn new(w: f32, x: f32, y: f32, z: f32) -> Self {
         Quat { w, x, y, z }
     }
 
+    /// Creates a quaternion with finite coefficients in `[w, x, y, z]` order.
+    ///
+    /// This method does not require or produce a unit quaternion. Call
+    /// [`Quat::normalize`] when a unit quaternion is required.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`QuatError::InvalidCoefficients`] if any coefficient is `NaN`
+    /// or infinite.
     pub fn try_new(w: f32, x: f32, y: f32, z: f32) -> Result<Self, QuatError> {
         if !(w.is_finite() && x.is_finite() && y.is_finite() && z.is_finite()) {
             return Err(QuatError::InvalidCoefficients(w, x, y, z));
@@ -187,6 +234,9 @@ impl Quat {
         Ok(Quat { w, x, y, z })
     }
 
+    /// Creates a quaternion from an array in `[w, x, y, z]` order.
+    ///
+    /// The array is stored without validation or normalization.
     pub fn from_array_wxyz(a: [f32; 4]) -> Self {
         Self {
             w: a[0],
@@ -196,10 +246,14 @@ impl Quat {
         }
     }
 
+    /// Returns the quaternion components by value in `[w, x, y, z]` order.
     pub fn as_array_wxyz(&self) -> [f32; 4] {
         [self.w, self.x, self.y, self.z]
     }
 
+    /// Returns the multiplicative identity quaternion `[1, 0, 0, 0]`.
+    ///
+    /// As an attitude, this represents no rotation between frames.
     pub fn identity() -> Self {
         Self {
             w: 1f32,
@@ -209,6 +263,7 @@ impl Quat {
         }
     }
 
+    /// Embeds a [`Vec3`] as the pure quaternion `[0, v.x, v.y, v.z]`.
     pub fn pure(v: Vec3) -> Self {
         Self {
             w: 0f32,
@@ -218,6 +273,7 @@ impl Quat {
         }
     }
 
+    /// Returns the quaternion's vector part `[x, y, z]` and discards `w`.
     pub fn vector_part(&self) -> Vec3 {
         Vec3 {
             x: self.x,
@@ -226,18 +282,34 @@ impl Quat {
         }
     }
 
+    /// Returns the squared Euclidean norm of the four coefficients.
     pub fn norm_squared(&self) -> f32 {
         self.w * self.w + self.x * self.x + self.y * self.y + self.z * self.z
     }
 
+    /// Returns the Euclidean norm of the four coefficients.
     pub fn norm(&self) -> f32 {
         libm::sqrtf(self.norm_squared())
     }
 
+    /// Returns a normalized copy of this quaternion.
+    ///
+    /// This is an alias for [`Quat::normalize`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Quat::normalize`].
     pub fn normalized(self) -> Result<Self, QuatError> {
         self.normalize()
     }
 
+    /// Returns a unit quaternion with the same direction as this quaternion.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`QuatError::InvalidCoefficients`] if any coefficient, the norm,
+    /// or a normalized coefficient is non-finite. Returns
+    /// [`QuatError::NormTooSmall`] if the norm is at or below `1e-11`.
     pub fn normalize(self) -> Result<Self, QuatError> {
         if !(self.w.is_finite() && self.x.is_finite() && self.y.is_finite() && self.z.is_finite()) {
             return Err(QuatError::InvalidCoefficients(
@@ -275,11 +347,21 @@ impl Quat {
         Ok(normalized)
     }
 
+    /// Normalizes this quaternion in place.
+    ///
+    /// The value is updated only when normalization succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Quat::normalize`].
     pub fn normalize_assign(&mut self) -> Result<(), QuatError> {
         *self = self.normalize()?;
         Ok(())
     }
 
+    /// Returns the quaternion conjugate `[w, -x, -y, -z]`.
+    ///
+    /// For a unit quaternion, the conjugate is also its multiplicative inverse.
     pub fn conjugate(self) -> Self {
         Self {
             w: self.w,
@@ -289,14 +371,29 @@ impl Quat {
         }
     }
 
+    /// Rotates a vector from the current IMU/body frame (`I`) into the
+    /// calibration/reference frame (`C`).
+    ///
+    /// This evaluates `q * [0, vector] * q.conjugate()`. `self` must be a unit
+    /// quaternion for the result to be a pure rotation without scaling.
     pub fn rotate_unit_i_to_c(self, u: Vec3) -> Vec3 {
         (self * Quat::pure(u) * self.conjugate()).vector_part()
     }
 
+    /// Rotates a vector from the calibration/reference frame (`C`) into the
+    /// current IMU/body frame (`I`).
+    ///
+    /// This evaluates `q.conjugate() * [0, vector] * q`. `self` must be a unit
+    /// quaternion for this to be the inverse of [`Quat::rotate_unit_i_to_c`].
     pub fn rotate_unit_c_to_i(self, v: Vec3) -> Vec3 {
         (self.conjugate() * Quat::pure(v) * self).vector_part()
     }
 
+    /// Computes the attitude derivative from angular rate in body coordinates.
+    ///
+    /// This implements `q_dot = 0.5 * (q * [0, omega_i])`, where `omega_i` is
+    /// expressed in the current IMU/body frame in radians per second. The
+    /// returned value is a quaternion derivative, not a normalized attitude.
     pub fn derivative_from_body_rate(self, omega_i: Vec3) -> Self {
         0.5_f32 * (self * Quat::pure(omega_i))
     }
