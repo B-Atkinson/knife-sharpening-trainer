@@ -283,9 +283,9 @@ impl Quat {
     pub fn conjugate(self) -> Self {
         Self {
             w: self.w,
-            x: -1f32 * self.x,
-            y: -1f32 * self.y,
-            z: -1f32 * self.z,
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
         }
     }
 

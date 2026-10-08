@@ -5,6 +5,8 @@ use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 #[derive(Debug)]
 pub enum Vec3Error {
     NormTooSmall(Vec3),
+    InvalidCoefficients(f32, f32, f32),
+    InvalidClampBounds(f32, f32),
 }
 
 impl core::fmt::Display for Vec3Error {
@@ -17,6 +19,16 @@ impl core::fmt::Display for Vec3Error {
                 v.y,
                 v.z,
                 v.norm()
+            ),
+            Vec3Error::InvalidCoefficients(x, y, z) => write!(
+                f,
+                "vector components x:{}, y:{}, z:{} must be finite and produce a finite magnitude",
+                x, y, z
+            ),
+            Vec3Error::InvalidClampBounds(min, max) => write!(
+                f,
+                "vector clamp bounds min:{} and max:{} must be finite and min must not exceed max",
+                min, max
             ),
         }
     }
@@ -161,21 +173,40 @@ impl Vec3 {
     }
 
     pub fn normalize(self) -> Result<Self, Vec3Error> {
-        let norm: f32 = self.norm();
+        if !(self.x.is_finite() && self.y.is_finite() && self.z.is_finite()) {
+            return Err(Vec3Error::InvalidCoefficients(self.x, self.y, self.z));
+        }
+
+        let norm = self.norm();
+        if !norm.is_finite() {
+            return Err(Vec3Error::InvalidCoefficients(self.x, self.y, self.z));
+        }
 
         if norm <= 1e-11_f32 {
             return Err(Vec3Error::NormTooSmall(self));
         }
 
-        Ok(self / norm)
+        let normalized = self / norm;
+        if !(normalized.x.is_finite() && normalized.y.is_finite() && normalized.z.is_finite()) {
+            return Err(Vec3Error::InvalidCoefficients(self.x, self.y, self.z));
+        }
+
+        Ok(normalized)
     }
 
-    pub fn component_clamp(self, min: f32, max: f32) -> Self {
-        Self {
+    pub fn component_clamp(self, min: f32, max: f32) -> Result<Self, Vec3Error> {
+        if !(self.x.is_finite() && self.y.is_finite() && self.z.is_finite()) {
+            return Err(Vec3Error::InvalidCoefficients(self.x, self.y, self.z));
+        }
+        if !(min.is_finite() && max.is_finite()) || min > max {
+            return Err(Vec3Error::InvalidClampBounds(min, max));
+        }
+
+        Ok(Self {
             x: self.x.clamp(min, max),
             y: self.y.clamp(min, max),
             z: self.z.clamp(min, max),
-        }
+        })
     }
 }
 
@@ -322,14 +353,56 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_rejects_non_finite_components() {
+        assert!(matches!(
+            Vec3::new(f32::NAN, 0.0_f32, 0.0_f32).normalize(),
+            Err(Vec3Error::InvalidCoefficients(_, _, _))
+        ));
+        assert!(matches!(
+            Vec3::new(0.0_f32, f32::INFINITY, 0.0_f32).normalize(),
+            Err(Vec3Error::InvalidCoefficients(_, _, _))
+        ));
+    }
+
+    #[test]
+    fn test_normalize_rejects_non_finite_norm() {
+        assert!(matches!(
+            Vec3::new(f32::MAX, f32::MAX, f32::MAX).normalize(),
+            Err(Vec3Error::InvalidCoefficients(_, _, _))
+        ));
+    }
+
+    #[test]
     fn test_component_clamp() {
         let v1 = Vec3::new(-2.0f32, 0.5f32, 3.0f32);
         assert_eq!(
-            v1.component_clamp(-1.0f32, 1.0f32),
+            v1.component_clamp(-1.0f32, 1.0f32).unwrap(),
             Vec3::new(-1.0f32, 0.5f32, 1.0f32)
         );
 
         let v2 = Vec3::new(-0.25f32, 0.0f32, 0.75f32);
-        assert_eq!(v2.component_clamp(-1.0f32, 1.0f32), v2);
+        assert_eq!(v2.component_clamp(-1.0f32, 1.0f32).unwrap(), v2);
+    }
+
+    #[test]
+    fn test_component_clamp_rejects_invalid_bounds() {
+        let vector = Vec3::new(-2.0_f32, 0.5_f32, 3.0_f32);
+
+        assert!(matches!(
+            vector.component_clamp(1.0_f32, -1.0_f32),
+            Err(Vec3Error::InvalidClampBounds(_, _))
+        ));
+        assert!(matches!(
+            vector.component_clamp(f32::NAN, 1.0_f32),
+            Err(Vec3Error::InvalidClampBounds(_, _))
+        ));
+    }
+
+    #[test]
+    fn test_component_clamp_rejects_non_finite_vector() {
+        assert!(matches!(
+            Vec3::new(f32::INFINITY, 0.0_f32, 0.0_f32).component_clamp(-1.0_f32, 1.0_f32),
+            Err(Vec3Error::InvalidCoefficients(_, _, _))
+        ));
     }
 }
